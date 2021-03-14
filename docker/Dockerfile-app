@@ -1,0 +1,21 @@
+FROM python:3.9.1-alpine3.12
+
+WORKDIR /usr/src/app
+
+RUN adduser -h /usr/src/app -H -D -s /bin/sh billing -u 45617
+
+COPY setup.py .
+COPY requirements.txt .
+RUN apk add --no-cache gcc musl-dev libffi-dev libressl-dev git make postgresql-dev postgresql-libs && \
+    chown billing:billing /usr/src/app && \
+    pip install -U pip && \
+    pip install -e $PWD && \
+    apk del gcc musl-dev libffi-dev libressl-dev git make postgresql-dev linux-headers openssl-dev
+
+COPY . .
+
+RUN chown billing:billing /usr/src/app
+
+USER billing
+
+COPY docker/entrypoint.sh /entrypoint.sh
