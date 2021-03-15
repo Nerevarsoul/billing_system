@@ -1,7 +1,14 @@
+import logging
+
+from asyncpg import CheckViolationError, ForeignKeyViolationError
 from fastapi import APIRouter, Response
 
 from app.billing.entities import *
 from app.billing.services import BillingService
+
+
+logger = logging.getLogger(__name__)
+
 
 account_router = APIRouter(
     prefix="/billing"
@@ -32,11 +39,17 @@ async def refill_deposit(charge: DepositRefill, response: Response):
 async def transfer_money(transfer: MoneyTransfer, response: Response):
     service = BillingService()
 
-    amount = await service.transfer(transfer)
-    if amount is None:
+    try:
+        amount = await service.transfer(transfer)
+    except CheckViolationError:
+        logging.error("Account %s doesn't have %s $", transfer.source, transfer.amount)
         response.status_code = 400
         return {
             "error": f"Account with id={transfer.source} doesn't have {transfer.amount}$"
         }
+    except ForeignKeyViolationError:
+        logging.error("Account with id=%s doesn't exist", transfer.destination)
+        response.status_code = 400
+        return {"error": f"Account with id={transfer.destination} doesn't exist"}
 
     return {"amount": amount}

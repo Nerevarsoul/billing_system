@@ -7,7 +7,7 @@ TESTING = False
 DB_CONF = {
     'database': os.getenv('POSTGRES_DB', 'billing'),
     'host': os.getenv('POSTGRES_HOST', '127.0.0.1'),
-    'port': os.getenv('POSTGRES_PORT', '5433'),
+    'port': os.getenv('POSTGRES_PORT', '5432'),
     'user': os.getenv('POSTGRES_USER', 'postgres'),
     'password': os.getenv('POSTGRES_PASSWORD', 'postgres'),
     'minsize': 1,

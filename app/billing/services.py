@@ -3,7 +3,7 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from asyncpg import CheckViolationError, ForeignKeyViolationError
+from asyncpg import ForeignKeyViolationError
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db import database
@@ -29,12 +29,10 @@ class BillingService:
 
     async def refill_deposit(self, charge: DepositRefill):
         async with database.transaction():
-            try:
-                amount = await self._update_account(charge.destination, charge.amount)
+            amount = await self._update_account(charge.destination, charge.amount)
+            if amount is not None:
                 await self._update_history(charge.destination, charge.amount)
-                return amount
-            except ForeignKeyViolationError:
-                logging.error("Account %s doesn't exist", charge.destination)
+            return amount
 
     async def _update_account(self, account_id: UUID, amount: Decimal) -> Decimal:
         query = accounts.update().values(
@@ -55,10 +53,13 @@ class BillingService:
 
     async def transfer(self, transfer: MoneyTransfer):
         async with database.transaction():
-            try:
-                amount = await self._update_account(transfer.source, -transfer.amount)
-                await self._update_account(transfer.destination, transfer.amount)
-                await self._update_history(transfer.destination, transfer.amount, transfer.source)
-                return amount
-            except CheckViolationError:
-                logging.error("Account %s doesn't have %s $", transfer.source, transfer.amount)
+            amount = await self._update_account(transfer.source, -transfer.amount)
+            if amount is None:
+                logger.error("Account with id=%s doesn't exist", transfer.source)
+                return
+            dest_amount = await self._update_account(transfer.destination, transfer.amount)
+            if dest_amount is None:
+                logger.error("Account with id=%s doesn't exist", transfer.destination)
+                raise ForeignKeyViolationError
+            await self._update_history(transfer.destination, transfer.amount, transfer.source)
+            return amount
